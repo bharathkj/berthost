@@ -1,6 +1,13 @@
 from flask import Flask, request, jsonify
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from scipy.special import softmax
+import firebase_admin
+from firebase_admin import credentials, firestore
+
+
+# Initialize Firebase with your credentials
+cred = credentials.Certificate(r'C:\Users\bhara\Downloads\berthost\serviceAccountKey.json')
+firebase_admin.initialize_app(cred)
 
 app = Flask(__name__)
 
@@ -13,26 +20,44 @@ def analysis(input_text):
     output = model(**encoded_text)
     scores = output.logits[0].detach().numpy()
     scores = softmax(scores)
-    # Convert float32 values to regular Python floats
     scores = [float(score) for score in scores]
     scores_dict = {
-        'NEGATIVE_SCORE': scores[0],
-        'NEUTRAL_SCORE': scores[1],
-        'POSITIVE_SCORE': scores[2]
+        'negative': scores[0],
+        'neutral': scores[1],
+        'positive': scores[2]
     }
     return scores_dict
 
 @app.route('/analyze-emotion', methods=['POST'])
 def analyze_emotion():
-    data = request.get_json()
+    try:
+        data = request.get_json()
 
-    if 'text_data' not in data:
-        return jsonify({'error': 'Missing text_data in request payload'}), 400
+        if 'text_data' not in data or 'user_name' not in data:
+            return jsonify({'error': 'Missing required fields in the request payload'}), 400
 
-    text_data = data['text_data']
-    scores_dict = analysis(text_data)
+        text_data = data['text_data']
+        user_name = data['user_name']
 
-    return jsonify(scores_dict)
+        scores_dict = analysis(text_data)
+
+        # Reference to the "users" collection
+        users_ref = firestore.client().collection("users")
+        # Reference to the specific user document
+        user_doc_ref = users_ref.document(user_name)
+        # Reference to the "emotions" subcollection within the user document
+        emotions_ref = user_doc_ref.collection("textemotion")
+        # Emotion data to be stored
+        emotion_data = {"timestamp": firestore.SERVER_TIMESTAMP, "emotion": scores_dict}
+        # Add emotion data to the "emotions" subcollection
+        emotions_ref.add(emotion_data)
+
+        return jsonify(scores_dict)
+
+    except Exception as e:
+        print(f"Error analyzing emotion: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True)
