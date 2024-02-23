@@ -6,7 +6,7 @@ from firebase_admin import credentials, firestore
 
 
 # Initialize Firebase with your credentials
-cred = credentials.Certificate(r'C:\Users\bhara\Downloads\berthost\serviceAccountKey.json')
+cred = credentials.Certificate(r'C:\Users\bhara\Downloads\Facial_Detection_Project-main\Facial_Detection_Project-main\serviceAccountKey.json')
 firebase_admin.initialize_app(cred)
 
 app = Flask(__name__)
@@ -60,4 +60,4 @@ def analyze_emotion():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True,port=5000, host='0.0.0.0')
